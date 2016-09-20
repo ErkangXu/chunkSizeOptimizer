@@ -17,59 +17,40 @@ class S(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self._set_headers()
-        print "in post method"
-        print "Content length is:"+self.headers['Content-Length']
         self.data_string = self.rfile.read(int(self.headers['Content-Length']))
 
         data = json.loads(self.data_string)
         # get the chunk number list
         previous_uploads=data['previous_uploads']
         
-        chunksize_list=[]
-        filesize_list=[]
         speed_list=[]
         chunknumber_list=[]
-        chunknumber_log_list=[]
-        chunknumber_log_sqr_list=[]
+        x_list=[]
         for k in previous_uploads:
-            filesize_list+=k['file_size'],
-            chunksize_list+=k['chunk_size'],
             speed_list+=k['speed_mbps'],
-            chunknumber_log=math.log(k['file_size']/k['chunk_size'], 320)
-            chunknumber_log_list+=chunknumber_log,
-            chunknumber_log_sqr_list+=chunknumber_log**2
+            chunknumber=k['file_size']/k['chunk_size']
+            chunknumber_list+=chunknumber,
+            chunknumber_log=math.log(chunknumber, 200)
+            x_list.append([1,chunknumber_log,chunknumber_log**2])
 
-        chunksize_array=np.array(chunksize_list)
-        filesize_array=np.array(filesize_list)
-        speed_array=np.array(speed_list)
+        print "chunknumbers are:"+str(chunknumber_list)
         chunknumber_array=np.array(chunknumber_list)
-        chunknumber_log_array=np.array(chunknumber_log_list)
-        chunknumber_log_sqr_array=np.array(chunknumber_log_sqr_list)
 
-        plt.plot(chunknumber_log_array, speed_array, 'ro', ms=5)
-        spl = UnivariateSpline(chunknumber_log_array, speed_array)
+        X=np.array(x_list)
+        Y=np.array(speed_list)
+        X_tans=np.transpose(X)
+        Theta=np.dot( np.dot(inv(np.dot(X_tans,X)), X_tans), Y)
 
-        plt.plot(chunknumber_log_array, spl(chunknumber_log_array), 'g', lw=3)
+        print "Theta is:"+str(Theta)
 
-        plt.show()
-
-        predictions=[]
-        for k in previous_uploads:
-            fs=k['file_size']
-            cs=k['chunk_size']
-            pro=float(cs)/fs
-            #chunk_number=fs/cs
-            #chunk_number=chunk_number+1 if fs%cs else chunk_number
-            xx=np.array([1, pro, pro**2, fs/cs, math.exp(pro)])
-            prediction=1/(np.dot(xx, Theta))
-            predictions.append(prediction)
-        print "input are      :"+str(map(lambda k:k['speed_mbps'], previous_uploads))
+        predictions=np.dot(X,Theta)
+        print "input are      :"+str(speed_list)
         print "predictions are:"+str(predictions)
         diag=[]
         for i in xrange(1,371):
             pro=float(1)/6400*i
             xx=np.array([1, pro, pro**2, 1/pro, math.exp(pro)])
-            prediction=1/(np.dot(xx, Theta))
+            prediction=np.dot(xx, Theta)
             diag.append(prediction)
         plt.plot(range(1,371),diag)
         plt.show()
